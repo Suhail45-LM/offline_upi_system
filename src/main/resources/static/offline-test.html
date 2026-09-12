@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Offline UPI - Local Storage Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 400px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #status { margin-top: 15px; font-weight: bold; color: #d9534f; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Phase 8: Offline Storage</h2>
+    <p>Simulate an offline payment to Chai Point (Merchant ID: 1).</p>
+
+    <!-- This simulates the user scanning a QR and clicking 'Pay' while Wi-Fi is OFF -->
+    <button onclick="simulateOfflinePayment()">Pay ₹200 (Offline)</button>
+
+    <p id="status"></p>
+</div>
+
+<script>
+    // 1. Initialize IndexedDB
+    const dbName = "OfflineUPIDatabase";
+    let db;
+
+    const request = indexedDB.open(dbName, 1);
+
+    // This runs the first time to create our offline 'transactions' table
+    request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        if (!db.objectStoreNames.contains("transactions")) {
+            db.createObjectStore("transactions", { keyPath: "transactionId" });
+            console.log("Offline database table created!");
+        }
+    };
+
+    request.onsuccess = (event) => {
+        db = event.target.result;
+        console.log("Connected to IndexedDB.");
+    };
+
+    request.onerror = (event) => {
+        console.error("Database error: " + event.target.errorCode);
+    };
+
+    // 2. The Offline Payment Function
+    function simulateOfflinePayment() {
+        if (!db) {
+            alert("Database not ready yet!");
+            return;
+        }
+
+        // Generate a unique ID locally since we can't reach the backend
+        const offlineTxnId = "TXN-OFF-" + Math.random().toString(36).substr(2, 9).toUpperCase();
+
+        // Create the transaction object
+        const transaction = {
+            transactionId: offlineTxnId,
+            merchantId: 1,
+            amount: 200.00,
+            paymentMode: "OFFLINE",
+            status: "PENDING_OFFLINE", // Crucial: Marks it for future syncing
+            createdAt: new Date().toISOString()
+        };
+
+        // Save to IndexedDB
+        const tx = db.transaction("transactions", "readwrite");
+        const store = tx.objectStore("transactions");
+        store.add(transaction);
+
+        tx.oncomplete = () => {
+            document.getElementById("status").innerText =
+                `✅ Saved Locally! Transaction ${offlineTxnId} is Pending Sync.`;
+            document.getElementById("status").style.color = "#5cb85c";
+        };
+
+        tx.onerror = (event) => {
+            document.getElementById("status").innerText = "❌ Failed to save transaction.";
+        };
+    }
+</script>
+</body>
+</html>
